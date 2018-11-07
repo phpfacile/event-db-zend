@@ -16,16 +16,25 @@ class EventService
     protected $adapter;
 
     /**
+     * Service to store the location of the event in database
+     *
+     * @var Adapter
+     */
+    protected $locationService;
+
+    /**
      * The constructor
      *
-     * @param AdapterInterface $adapter Adapter for the database
+     * @param AdapterInterface $adapter         Adapter for the database
+     * @param LocationService  $locationService Service to store the location of the event in database
      *
-     * @return LocationService
+     * @return EventService
      */
-    public function __construct(AdapterInterface $adapter)
-    {
-        $this->adapter = $adapter;
-    }
+     public function __construct(AdapterInterface $adapter, $locationService)
+     {
+         $this->adapter         = $adapter;
+         $this->locationService = $locationService;
+     }
 
     /**
      * Saves into database an event described as a StdClass
@@ -78,7 +87,7 @@ class EventService
 
     /**
      * Returns a list of event as an array ready to be exported in JSON format
-     * (as expected by the CPLC event map) by simple call to json_encode();
+     * (as expected by the target project) by simple call to json_encode();
      *
      * @param mixed            $filter           Filter to be applied to the event list (to be defined)
      * @param EventJsonService $eventJsonService A service to transform database row into a JSON ready array

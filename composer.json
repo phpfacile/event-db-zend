@@ -1,0 +1,34 @@
+{
+    "name": "phpfacile/event-db-zend",
+    "description": "This service basically stores an event in a database (using zend-db) and get list of stored events as JSON string.",
+    "keywords": ["event", "json", "database"],
+    "homepage": "https://github.com/phpfacile/event-db-zend",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "PHP Facile!",
+            "homepage": "https://www.phpfacile.com/"
+        }
+    ],
+    "minimum-stability": "dev",
+    "prefer-stable": true,
+    "require": {
+        "php": ">=7.0.0",
+        "phpfacile/event-json": "^1.0",
+        "zendframework/zend-db": "^2.5"
+    },
+    "require-dev": {
+        "squizlabs/php_codesniffer": "3.*"
+    },
+    "scripts": {
+        "cs-check": "phpcs -s src",
+        "cs-check-psr": "phpcs -s --standard=PSR1,PSR2 src",
+        "cs-check-pear": "phpcs -s --standard=PEAR src",
+        "cs-fix": "phpcbf src"
+    },
+    "autoload": {
+        "psr-4": {
+          "PHPFacile\\Event\\Db\\": "src/"
+        }
+    }
+}

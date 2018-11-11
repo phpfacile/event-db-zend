@@ -1,0 +1,4 @@
+* EVOL Store event submission data + status + no required geocoding
+  - Store more event submission data (submitter, url, event type, etc.)
+  - Store and manage status (ex: submitted)
+  - No geocoding required on event submission (this can be done later during event approval)

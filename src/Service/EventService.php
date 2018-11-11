@@ -22,6 +22,8 @@ class EventService
      */
     protected $locationService;
 
+    protected $newEventExtraData = [];
+
     /**
      * The constructor
      *
@@ -30,52 +32,72 @@ class EventService
      *
      * @return EventService
      */
-     public function __construct(AdapterInterface $adapter, $locationService)
-     {
-         $this->adapter         = $adapter;
-         $this->locationService = $locationService;
-     }
+    public function __construct(AdapterInterface $adapter)
+    {
+        $this->adapter           = $adapter;
+        $this->newEventExtraData = ['status' => 'submitted'];
+    }
+
+    public function setLocationService($locationService)
+    {
+        $this->locationService = $locationService;
+    }
+
+
+    public function getDbRowFromStdClassEventSubmission($eventSubmission)
+    {
+        $event      = $eventSubmission->event;
+        $submitter  = $eventSubmission->submitter;
+
+        // Here we assume that submitter data are stored within the same table
+        // as the event. But this should be configurable and an additionnal service call
+        // might be required (to get a user id for example)
+        // Here type field name should be configuration. Should it be
+        // type (for a string) or type_id ?
+        $values           = [];
+        $values['locale'] = $eventSubmission->locale;
+        $values['name']   = $event->name;
+        $values['url']    = $event->url;
+        $values['type']   = $event->type;
+        $values['datetime_start'] = $event->dateTimeStart;
+        $values['datetime_end']   = $event->dateTimeEnd;
+        //$values['address_full']   = $event->address->name;
+        $values['place_name']   = $event->location->place->name;
+        if (property_exists($event->location->place, 'postalCode')) {
+            $values['postal_code']  = $event->location->place->postalCode;
+        }
+        $values['country_code'] = $event->location->place->country->code;
+
+        $values['submitter_name']  = $submitter->name;
+        $values['submitter_email'] = $submitter->email;
+
+        if (property_exists($event->location->place, 'geocodedLocationId')) {
+            $values['place_geocoder_location_id'] = $event->location->place->geocodedLocationId;
+        }
+
+        if (property_exists($eventSubmission, 'status')) {
+            $values['status'] = $eventSubmission->status;
+        }
+
+        return $values;
+    }
 
     /**
-     * Saves into database an event described as a StdClass
+     * Saves into database an event submission (i.e. event + submitter data + ...) described as a StdClass
      * REM: Attributes validity checking is not in the scope of this method and must be performed by the calling method
      *
-     * @param StdClass $event A class with name, dateTimeStart, dateTimeEnd, addressFull, etc. fields
+     * @param StdClass $eventSubmission A class with a event field, a user field and others if required
      *
      * @return void
      */
-    public function insertStdClassEvent($event)
+    public function insertStdClassEventSubmission($eventSubmission)
     {
         // TODO Add SQL transaction ?
-        $placeId = $this->locationService->getIdOfStdClassLocationAfterInsertIfNeeded($event->place);
 
-        $values         = [];
-        $values['name'] = $event->name;
-        $values['datetime_start'] = $event->dateTimeStart;
-        $values['datetime_end']   = $event->dateTimeEnd;
-        $values['address_full']   = $event->address->name;
-        $values['place_id']       = $placeId;
+        $values = self::getDbRowFromStdClassEventSubmission($eventSubmission);
+        $values += $this->newEventExtraData;
 
-        /*
-            Compute UTC datetimes
-            But only if timezone is available (which is the case with geonames
-            but not with nominatim)
-        */
-
-        if (strlen($event->place->geocoding->timezone) > 0) {
-            $timeZone = new \DateTimeZone($event->place->geocoding->timezone);
-
-            $dateTime = new \DateTime($event->dateTimeStart, $timeZone);
-            $dateTime->setTimeZone(new \DateTimeZone('UTC'));
-            $values['datetime_start_utc'] = $dateTime->format('Y-m-d H:i:s');
-
-            $dateTime = new \DateTime($event->dateTimeEnd, $timeZone);
-            $dateTime->setTimeZone(new \DateTimeZone('UTC'));
-            $values['datetime_end_utc'] = $dateTime->format('Y-m-d H:i:s');
-        } else {
-            $values['datetime_start_utc'] = null;
-            $values['datetime_end_utc']   = null;
-        }
+        // TODO Add insertion date/time UTC
 
         $sql   = new Sql($this->adapter);
         $query = $sql
@@ -84,6 +106,128 @@ class EventService
         $stmt  = $sql->prepareStatementForSqlObject($query);
         $stmt->execute();
     }
+
+    /**
+     */
+    public function updateStdClassEventSubmission($eventSubmission)
+    {
+        if ((false === property_exists($eventSubmission, 'id'))
+            ||(0 == strlen($eventSubmission->id))) {
+            throw new \Exception('Can\'t update. No event submission id provided.');
+        }
+
+        $place = $eventSubmission->event->location->place;
+        $geocodedLocationId = $this->locationService->getGeocoderLocationIdFromGeocodedPlaceStdClassAfterInsertIfNeeded($place);
+        $eventSubmission->event->location->place->geocodedLocationId = $geocodedLocationId;
+
+        $values = self::getDbRowFromStdClassEventSubmission($eventSubmission);
+
+        $sql   = new Sql($this->adapter);
+        $query = $sql
+            ->update('events')
+            ->set($values)
+            ->where(['id' => $eventSubmission->id]);
+        $stmt  = $sql->prepareStatementForSqlObject($query);
+        $stmt->execute();
+    }
+
+    public static function row2EventSubmission($row, $eventSubmission)
+    {
+        if (false === property_exists($eventSubmission, 'event')) {
+            $eventSubmission->event = new \StdClass();
+        }
+        if (false === property_exists($eventSubmission, 'submitter')) {
+            $eventSubmission->submitter = new \StdClass();
+        }
+        if (false === property_exists($eventSubmission->event, 'location')) {
+            $eventSubmission->event->location = new \StdClass();
+        }
+        if (false === property_exists($eventSubmission->event->location, 'place')) {
+            $eventSubmission->event->location->place = new \StdClass();
+        }
+        if (false === property_exists($eventSubmission->event->location->place, 'country')) {
+            $eventSubmission->event->location->place->country = new \StdClass();
+        }
+        if (true === array_key_exists('id', $row)) {
+            $eventSubmission->id = $row['id'];
+        }
+        if (true === array_key_exists('locale', $row)) {
+            $eventSubmission->locale = $row['locale'];
+        }
+        if (true === array_key_exists('name', $row)) {
+            $eventSubmission->event->name = $row['name'];
+        }
+        if (true === array_key_exists('url', $row)) {
+            $eventSubmission->event->url = $row['url'];
+        }
+        if (true === array_key_exists('type', $row)) {
+            $eventSubmission->event->type = $row['type'];
+        }
+        if (true === array_key_exists('datetime_start', $row)) {
+            $eventSubmission->event->dateTimeStart = $row['datetime_start'];
+        }
+        if (true === array_key_exists('datetime_end', $row)) {
+            $eventSubmission->event->dateTimeEnd = $row['datetime_end'];
+        }
+        if (true === array_key_exists('place_name', $row)) {
+            $eventSubmission->event->location->place->name = $row['place_name'];
+        }
+        if (true === array_key_exists('postal_code', $row)) {
+            $eventSubmission->event->location->place->postalCode = $row['postal_code'];
+        }
+        if (true === array_key_exists('country_code', $row)) {
+            $eventSubmission->event->location->place->country->code = $row['country_code'];
+        }
+        if (true === array_key_exists('submitter_name', $row)) {
+            $eventSubmission->submitter->name = $row['submitter_name'];
+        }
+        if (true === array_key_exists('submitter_email', $row)) {
+            $eventSubmission->submitter->email = $row['submitter_email'];
+        }
+        return $eventSubmission;
+    }
+
+    public function getNextEventSubmissionToBeValidated()
+    {
+        // TODO validation checking rule should be configurable
+        $where = ['status' => 'submitted'];
+
+        $sql   = new Sql($this->adapter);
+        $query = $sql
+            ->select('events')
+            ->where($where)
+            ->limit(1);
+        $stmt  = $sql->prepareStatementForSqlObject($query);
+        $rows = $stmt->execute();
+        if (false === ($row = $rows->current())) {
+            return null;
+        }
+
+        $eventSubmission = new \StdClass();
+        return self::row2EventSubmission($row, $eventSubmission);
+    }
+
+    /*
+        Compute UTC datetimes
+        But only if timezone is available (which is the case with geonames
+        but not with nominatim)
+    */
+    /*
+    if (strlen($event->place->geocoding->timezone) > 0) {
+        $timeZone = new \DateTimeZone($event->place->geocoding->timezone);
+
+        $dateTime = new \DateTime($event->dateTimeStart, $timeZone);
+        $dateTime->setTimeZone(new \DateTimeZone('UTC'));
+        $values['datetime_start_utc'] = $dateTime->format('Y-m-d H:i:s');
+
+        $dateTime = new \DateTime($event->dateTimeEnd, $timeZone);
+        $dateTime->setTimeZone(new \DateTimeZone('UTC'));
+        $values['datetime_end_utc'] = $dateTime->format('Y-m-d H:i:s');
+    } else {
+        $values['datetime_start_utc'] = null;
+        $values['datetime_end_utc']   = null;
+    }
+    */
 
     /**
      * Returns a list of event as an array ready to be exported in JSON format
@@ -113,14 +257,21 @@ class EventService
                 ]
             )
             ->join(
-                'locations',
-                'events.place_id=locations.id',
+                'geocoder_locations',
+                'events.place_geocoder_location_id=geocoder_locations.id',
                 [
                     'geocoded_longitude' => 'geocoded_longitude',
                     'geocoded_latitude'  => 'geocoded_latitude',
-                    'location_place'     => 'place',
-                    'location_country'   => 'country',
                 ]
+            )
+            ->join(
+                'places',
+                'geocoder_locations.place_id = places.id',
+                [
+                    'location_place' => 'name',
+                    'location_country' => 'country_code'
+                ],
+                'left'
             );
         $stmt  = $sql->prepareStatementForSqlObject($query);
         $rows  = $stmt->execute();

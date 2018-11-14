@@ -21,7 +21,7 @@ CREATE TABLE events (
     submitter_name VARCHAR(64) NOT NULL,
     submitter_email VARCHAR(64) NOT NULL,
     locale VARCHAR(5) NOT NULL,
-    insertion_datetime_utc DATETIME NULL,
+    submission_datetime_utc DATETIME NOT NULL,
     status VARCHAR(32) NOT NULL DEFAULT 'submitted',
     place_geocoder_location_id BIGINT UNSIGNED NULL,
     FOREIGN KEY (place_geocoder_location_id) REFERENCES geocoder_locations(id)

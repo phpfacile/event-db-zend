@@ -2,6 +2,7 @@
 namespace PHPFacile\Event\Db\Service;
 
 use PHPFacile\Event\Json\EventJsonService;
+use PHPFacile\Zend\Db\Helper\ZendDbHelper;
 
 use Zend\Db\Adapter\AdapterInterface;
 use Zend\Db\Sql\Sql;
@@ -42,7 +43,6 @@ class EventService
     {
         $this->locationService = $locationService;
     }
-
 
     public function getDbRowFromStdClassEventSubmission($eventSubmission)
     {
@@ -97,7 +97,7 @@ class EventService
         $values = self::getDbRowFromStdClassEventSubmission($eventSubmission);
         $values += $this->newEventExtraData;
 
-        // TODO Add insertion date/time UTC
+        $values['submission_datetime_utc'] = ZendDbHelper::getUTCTimestampExpression($this->adapter);
 
         $sql   = new Sql($this->adapter);
         $query = $sql
@@ -136,77 +136,125 @@ class EventService
         if (false === property_exists($eventSubmission, 'event')) {
             $eventSubmission->event = new \StdClass();
         }
+
         if (false === property_exists($eventSubmission, 'submitter')) {
             $eventSubmission->submitter = new \StdClass();
         }
+
         if (false === property_exists($eventSubmission->event, 'location')) {
             $eventSubmission->event->location = new \StdClass();
         }
+
         if (false === property_exists($eventSubmission->event->location, 'place')) {
             $eventSubmission->event->location->place = new \StdClass();
         }
+
         if (false === property_exists($eventSubmission->event->location->place, 'country')) {
             $eventSubmission->event->location->place->country = new \StdClass();
         }
+
+        if (true === array_key_exists('submission_datetime_utc', $row)) {
+            $eventSubmission->submissionDateTimeUTC = $row['submission_datetime_utc'];
+        }
+
         if (true === array_key_exists('id', $row)) {
             $eventSubmission->id = $row['id'];
         }
+
         if (true === array_key_exists('locale', $row)) {
             $eventSubmission->locale = $row['locale'];
         }
+
         if (true === array_key_exists('name', $row)) {
             $eventSubmission->event->name = $row['name'];
         }
+
         if (true === array_key_exists('url', $row)) {
             $eventSubmission->event->url = $row['url'];
         }
+
         if (true === array_key_exists('type', $row)) {
             $eventSubmission->event->type = $row['type'];
         }
+
         if (true === array_key_exists('datetime_start', $row)) {
             $eventSubmission->event->dateTimeStart = $row['datetime_start'];
         }
+
         if (true === array_key_exists('datetime_end', $row)) {
             $eventSubmission->event->dateTimeEnd = $row['datetime_end'];
         }
+
         if (true === array_key_exists('place_name', $row)) {
             $eventSubmission->event->location->place->name = $row['place_name'];
         }
+
         if (true === array_key_exists('postal_code', $row)) {
             $eventSubmission->event->location->place->postalCode = $row['postal_code'];
         }
+
         if (true === array_key_exists('country_code', $row)) {
             $eventSubmission->event->location->place->country->code = $row['country_code'];
         }
+
         if (true === array_key_exists('submitter_name', $row)) {
             $eventSubmission->submitter->name = $row['submitter_name'];
         }
+
         if (true === array_key_exists('submitter_email', $row)) {
             $eventSubmission->submitter->email = $row['submitter_email'];
         }
+
         return $eventSubmission;
     }
 
-    public function getNextEventSubmissionToBeValidated()
+    /**
+     * Returns a list of event matching a given criteria
+     *
+     * @param array $where Filter to be applied on table rows
+     * @param int   $limit Max number of results
+     *
+     * @return StdClass[]
+     */
+    public function getEventSubmissions($where, $limit = 10)
     {
-        // TODO validation checking rule should be configurable
-        $where = ['status' => 'submitted'];
-
         $sql   = new Sql($this->adapter);
         $query = $sql
             ->select('events')
             ->where($where)
-            ->limit(1);
+            ->limit($limit);
         $stmt  = $sql->prepareStatementForSqlObject($query);
         $rows = $stmt->execute();
-        if (false === ($row = $rows->current())) {
-            return null;
+
+        $eventSubmissions = [];
+        foreach ($rows as $row) {
+            $eventSubmission = new \StdClass();
+            $eventSubmissions[] = self::row2EventSubmission($row, $eventSubmission);
         }
 
-        $eventSubmission = new \StdClass();
-        return self::row2EventSubmission($row, $eventSubmission);
+        return $eventSubmissions;
     }
 
+    public function getNextEventSubmissionsToBeValidated($limit = 10)
+    {
+        // TODO validation checking rule (field name=status? value=submitted?) should be configurable
+        $where = ['status' => 'submitted'];
+        return $this->getEventSubmissions($where, $limit);
+    }
+
+    /**
+     *
+     * @return StdClass|null
+     */
+    public function getNextEventSubmissionToBeValidated()
+    {
+        $events = $this->getNextEventSubmissionsToBeValidated(1);
+        if (1 === count($events)) {
+            return $events[0];
+        }
+
+        return null;
+    }
     /*
         Compute UTC datetimes
         But only if timezone is available (which is the case with geonames

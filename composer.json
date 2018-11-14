@@ -15,6 +15,7 @@
     "require": {
         "php": ">=7.0.0",
         "phpfacile/event-json": "^1.0",
+        "phpfacile/zend-db-ext": "^1.0.1",
         "zendframework/zend-db": "^2.5"
     },
     "require-dev": {

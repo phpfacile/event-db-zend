@@ -1,3 +1,6 @@
+* EVOL Allow retrieval of a list of events
+* EVOL Store event submission datetime UTC
+
 1.0.3 (2018-11-13)
 ---------
 * EVOL Store event submission data + status + no required geocoding

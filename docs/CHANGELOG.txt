@@ -1,3 +1,5 @@
+1.0.4 (2018-11-14)
+---------
 * EVOL Allow retrieval of a list of events
 * EVOL Store event submission datetime UTC
 

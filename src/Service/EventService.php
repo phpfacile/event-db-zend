@@ -108,8 +108,14 @@ class EventService
     }
 
     /**
+     * Updates an event submission
+     *
+     * @param StdClass $eventSubmission An event submission
+     * @param array    $extraValues     Associative array where keys are database table field names
+     *
+     * @return void
      */
-    public function updateStdClassEventSubmission($eventSubmission)
+    public function updateStdClassEventSubmission($eventSubmission, $extraValues)
     {
         if ((false === property_exists($eventSubmission, 'id'))
             ||(0 == strlen($eventSubmission->id))) {
@@ -121,6 +127,9 @@ class EventService
         $eventSubmission->event->location->place->geocodedLocationId = $geocodedLocationId;
 
         $values = self::getDbRowFromStdClassEventSubmission($eventSubmission);
+        if (null !== $extraValues) {
+            $values += $extraValues;
+        }
 
         $sql   = new Sql($this->adapter);
         $query = $sql

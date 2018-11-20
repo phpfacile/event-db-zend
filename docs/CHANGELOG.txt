@@ -1,3 +1,5 @@
+* EVOL Add ability to store extra data values during event update
+
 1.0.4 (2018-11-14)
 ---------
 * EVOL Allow retrieval of a list of events

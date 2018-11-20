@@ -39,6 +39,11 @@ class EventService
         $this->newEventExtraData = ['status' => 'submitted'];
     }
 
+    public function getAdapter()
+    {
+        return $this->adapter;
+    }
+
     public function setLocationService($locationService)
     {
         $this->locationService = $locationService;

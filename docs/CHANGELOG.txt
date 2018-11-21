@@ -1,3 +1,4 @@
+* FIX Add missing event fields to be returned by getEventsAsArrayReadyForJSON
 * EVOL Add getAdapter() method
 * EVOL Add ability to store extra data values during event update
 

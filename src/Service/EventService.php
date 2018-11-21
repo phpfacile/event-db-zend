@@ -316,6 +316,10 @@ class EventService
                     'event_id'       => 'id',
                     'name'           => 'name',
                     'datetime_start' => 'datetime_start',
+                    'url'            => 'url',
+                    'type'           => 'type',
+                    'status'         => 'status',
+                    'postal_code'    => 'postal_code',
                 ]
             )
             ->join(
